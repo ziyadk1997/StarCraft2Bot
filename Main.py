@@ -17,6 +17,12 @@ class LOZ(sc2.BotAI):
         await self.distribute_workers()
         await self.build_workers()
         await self.build_pylons()
+        await self.build_assimilators()
+        await self.expand()
+        await self.offensive_force_buildings()
+        await self.build_offensive_force()
+        await self.stalker_attack()
+        await self.voidray_attack()
     #Build Workers
     async def build_workers(self):
         #check that no more than 16 workers for each NEXUS and max limit for workers has not been reached
@@ -35,7 +41,7 @@ class LOZ(sc2.BotAI):
                 #check if can afford to build pylon
                 if self.can_afford(PYLON):
                     await self.build(PYLON, near=nexuses.first)
-#Build Assimilators
+    #Build Assimilators
     async def build_assimilators(self):
         #loop on all ready nexuses
         for nexus in self.units(NEXUS).ready:
@@ -74,7 +80,7 @@ class LOZ(sc2.BotAI):
                 if len(self.units(STARGATE)) < ((self.iteration / self.ITERATIONS_PER_MINUTE)/2):
                     if self.can_afford(STARGATE) and not self.already_pending(STARGATE):
                         await self.build(STARGATE, near=pylon)
-    #Build Enemies
+    #Build army
     async def build_offensive_force(self):
         #let every gateway create a stalker if it is ready and can afford
         for gw in self.units(GATEWAY).ready.noqueue:
@@ -85,3 +91,50 @@ class LOZ(sc2.BotAI):
         for sg in self.units(STARGATE).ready.noqueue:
             if self.can_afford(VOIDRAY) and self.supply_left > 0:
                 await self.do(sg.train(VOIDRAY))
+    #Find Target
+    def find_target(self, state):
+        #choose a random enemy 
+        if len(self.known_enemy_units) > 0:
+            return random.choice(self.known_enemy_units)
+        #if no enemies return random structure
+        elif len(self.known_enemy_structures) > 0:
+            return random.choice(self.known_enemy_structures)
+        #if no structures or enemies go to enemy start location
+        else:
+            return self.enemy_start_locations[0]
+    #Stalker Attack
+    async def stalker_attack(self):
+        #threshold 15 for attacking 5 for defending
+        #if check that units are more than attacking units
+        if self.units(STALKER).amount > 15:
+             #attack with every idle (given game state so can attack any enemy not just detected)
+            for s in self.units(STALKER).idle:
+                await self.do(s.attack(self.find_target(self.state)))
+        #if units are more than defending units but not attacking attack 
+        elif self.units(STALKER).amount > 5:
+            #attack only detected enemies
+            if len(self.known_enemy_units) > 0:
+                for s in self.units(STALKER).idle:
+                    await self.do(s.attack(random.choice(self.known_enemy_units)))
+    #VOIDRAY ATTACK
+    async def voidray_attack(self):
+        #threshold 8 for attacking 3 for defending
+        #if check that units are more than attacking units
+        if self.units(VOIDRAY).amount > 8:
+             #attack with every idle (given game state so can attack any enemy not just detected)
+            for s in self.units(VOIDRAY).idle:
+                await self.do(s.attack(self.find_target(self.state)))
+        #if units are more than defending units but not attacking attack 
+        elif self.units(VOIDRAY).amount > 3:
+            #attack only detected enemies
+            if len(self.known_enemy_units) > 0:
+                for s in self.units(VOIDRAY).idle:
+                    await self.do(s.attack(random.choice(self.known_enemy_units)))
+            
+
+# Run Game with AbyssalReefLE Map and the 2 players specified are LOZ() and a computer difficulty hard (realtime set to false to skip for testing)
+run_game(maps.get("AbyssalReefLE"), [
+    Bot(Race.Protoss, LOZ()),
+    Computer(Race.Terran, Difficulty.Hard)
+    ], realtime=False)
+
